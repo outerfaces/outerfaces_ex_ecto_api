@@ -10,12 +10,14 @@ defmodule OuterfacesEctoApi.QueryEngine do
 
   def build(schema, filters, params, opts \\ []) when is_map(params) and is_list(opts) do
     queryable = Keyword.get(opts, :base_queryable, schema)
+    sort_specs = Keyword.get(opts, :sort_specs, [])
 
     QueryBuilder.build_index_query(
       schema,
       queryable,
       %{"query" => Jason.encode!(params)},
-      filters
+      filters,
+      sort_specs
     )
   end
 

@@ -1,5 +1,8 @@
 # Outerfaces Ecto API Query System
 
+[![Hex.pm](https://img.shields.io/hexpm/v/outerfaces_ex_ecto_api.svg)](https://hex.pm/packages/outerfaces_ex_ecto_api)
+[![HexDocs](https://img.shields.io/badge/hex-docs-blue.svg)](https://hexdocs.pm/outerfaces_ex_ecto_api)
+
 A comprehensive, declarative query building and serialization system for Phoenix/Ecto applications that supports complex filtering, sorting, pagination, and deep association preloading through JSON API requests.
 
 ## Architecture Overview
@@ -60,8 +63,28 @@ Provides a macro for schemas to define their serialization behavior with hooks f
 ```elixir
 # In your controller or filter module
 @index_filters [
-  BaseFilters.is_active(),  # Reusable base filter with default
-  BaseFilters.organization_id(),
+  {
+    :is_active,
+    {
+      QueryFilter,
+      :by_field,
+      :archived_at,
+      {:is_nil, :not_nil},
+      _filter_with_nil_values = false,
+      _fallback_value = true
+    }
+  },
+  {
+    :tenant_id,
+    {
+      QueryFilter,
+      :by_field,
+      :tenant_id,
+      :==,
+      _allow_nil = false,
+      _default_or_fallback_filter = nil
+    }
+  },
   {
     :custom_field,
     {
@@ -91,9 +114,27 @@ Provides a macro for schemas to define their serialization behavior with hooks f
 ### 2. Define Sort Specifications
 
 ```elixir
-@sort_specs [
-  BaseSorts.created_at_desc_default(),  # Default sort
-  BaseSorts.id_asc_default(),
+@index_sorts [
+  {
+    :created_at,
+    {
+      QuerySort,
+      :by_field,
+      :created_at,
+      :desc,
+      _default = true
+    }
+  },
+  {
+    :by_some_id,
+    {
+      QuerySort,
+      :by_field,
+      :some_id,
+      :asc,
+      _default = false
+    }
+  },
   {
     :custom_sort,
     {
@@ -136,7 +177,7 @@ def index(conn, params) do
     MySchema,
     @index_preloads,
     @index_filters,
-    @sort_specs,
+    @index_sorts,
     params
   )
   |> then(fn {:ok, response} -> json(conn, response) end)
@@ -176,13 +217,13 @@ const queryParams = {
   query: JSON.stringify({
     filters: {
       is_active: true,
-      organization_id: 123,
-      "user.name": "John"  // Association filtering
+      tenant_id: 123,
+      association_filter: "John"
     },
-    sort: ["created_at:desc", "name:asc"]
+    sort: ["created_at:desc", "custom_sort:desc"]
   }),
-  page: 1,
-  per_page: 25
+  limit: 50,
+  offset: 0
 }
 
 fetch(`/api/resources?${new URLSearchParams(queryParams)}`)
@@ -198,19 +239,16 @@ fetch(`/api/resources?${new URLSearchParams(queryParams)}`)
       {
         id: 1,
         name: "Resource 1",
-        schema: "MyApp.MySchema",
-        user: {
-          id: 1,
-          name: "John",
-          schema: "MyApp.User"
-        }
+        schema: "MyApp.MySchema"
       }
     ],
     page_info: {
-      current_page: 1,
-      total_pages: 5,
-      total_count: 123,
-      per_page: 25
+      limit: 50,
+      offset: 0,
+      total_count: 200,
+      total_pages: 4,
+      has_next_page: true,
+      has_previous_page: false
     },
     schema: "MyApp.MySchema"
   }

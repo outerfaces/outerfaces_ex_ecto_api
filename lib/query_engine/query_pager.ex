@@ -6,10 +6,10 @@ defmodule OuterfacesEctoApi.QueryEngine.QueryPager do
 
   Parameters:
     - query: The Ecto query.
-    - params: A map containing "order_by", "limit", and "offset".
+    - params: A map containing "limit", and "offset".
 
   Example usage:
-    QueryPager.apply_paging(query, %{"order_by" => "created_at:desc,name:asc", "limit" => 10, "offset" => 20})
+    QueryPager.apply_paging(query, %{"limit" => 10, "offset" => 20})
   """
   def apply_paging(query, params) do
     params = Map.get(params, "query", "{}") |> Jason.decode!()

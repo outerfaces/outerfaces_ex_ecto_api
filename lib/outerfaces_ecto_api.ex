@@ -3,16 +3,38 @@ defmodule OuterfacesEctoApi do
   Documentation for `OuterfacesEctoApi`.
   """
 
-  @doc """
-  Hello world.
+  defdelegate all(
+                repo,
+                schema,
+                preloads,
+                filter_specs,
+                sort_specs,
+                params,
+                opts \\ []
+              ),
+              to: OuterfacesEctoApi.QueryEngine
 
-  ## Examples
+  defdelegate build(
+                schema,
+                filters,
+                params,
+                opts \\ []
+              ),
+              to: OuterfacesEctoApi.QueryEngine
 
-      iex> OuterfacesEctoApi.hello()
-      :world
+  defdelegate get(
+                repo,
+                schema,
+                id,
+                preloads,
+                opts \\ []
+              ),
+              to: OuterfacesEctoApi.QueryEngine
 
-  """
-  def hello do
-    :world
-  end
+  defdelegate to_jsdoc(
+                schema,
+                controller_module \\ nil
+              ),
+              to: OuterfacesEctoApi.Codegen.JsCodegen,
+              as: :generate_js_typedef
 end

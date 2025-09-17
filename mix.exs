@@ -1,13 +1,19 @@
 defmodule OuterfacesEctoApi.MixProject do
   use Mix.Project
 
+  @github_url "https://github.com/outerfaces/outerfaces_ex_ecto_api"
+
   def project do
     [
       app: :outerfaces_ex_ecto_api,
-      version: "0.1.0",
+      version: "0.1.1",
       elixir: "~> 1.18",
       start_permanent: Mix.env() == :prod,
-      deps: deps()
+      deps: deps(),
+      name: "Outerfaces Ecto API",
+      description: "'Good Enough' Query Engine for Ecto",
+      source_url: @github_url,
+      package: package()
     ]
   end
 
@@ -22,7 +28,16 @@ defmodule OuterfacesEctoApi.MixProject do
   defp deps do
     [
       {:ecto_sql, "~> 3.12"},
-      {:jason, "~> 1.2"}
+      {:jason, "~> 1.2"},
+      {:ex_doc, "~> 0.37", only: :dev, runtime: false}
+    ]
+  end
+
+  defp package do
+    [
+      maintainers: ["Aligned To Development - development@alignedto.dev"],
+      licenses: ["MIT"],
+      links: %{"GitHub" => @github_url}
     ]
   end
 end
