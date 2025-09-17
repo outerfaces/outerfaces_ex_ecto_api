@@ -77,6 +77,7 @@ defmodule QueryEngineTest do
         _fallback_value = nil
       }
     ]
+
     built_query =
       QueryEngine.build(
         TestSchemaOne,

@@ -4,7 +4,7 @@ defmodule Mix.Tasks.OuterfacesEctoApiJsCodegen do
   @shortdoc "Generates JSDoc types for api resources"
 
   @target_base_dir "outerfaces/projects/"
-  @target_project_base "/tao_api_codegen/js/raw/"
+  @target_project_base "/_api_codegen/js/raw/"
 
   alias OuterfacesEctoApi.Codegen.JsCodegen
 

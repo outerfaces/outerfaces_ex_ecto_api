@@ -6,7 +6,7 @@ defmodule OuterfacesEctoApi.MixProject do
   def project do
     [
       app: :outerfaces_ex_ecto_api,
-      version: "0.1.1",
+      version: "0.1.2",
       elixir: "~> 1.18",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
