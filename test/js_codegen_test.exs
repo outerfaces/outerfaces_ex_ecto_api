@@ -8,8 +8,7 @@ defmodule JsCodegenTest do
       field(:name, :string)
       field(:value, :integer)
       field(:archived_at, :utc_datetime)
-      belongs_to(:user, OuterfacesEctoApiTest.User)
-      has_many(:things, OuterfacesEctoApiTest.Thing)
+      belongs_to(:thing, OuterfacesEctoApiTest.Thing)
       timestamps()
     end
   end
@@ -26,11 +25,10 @@ defmodule JsCodegenTest do
               * @property {string} name
               * @property {number} value
               * @property {string} archived_at
-              * @property {number} user_id
+              * @property {number} thing_id
               * @property {string} inserted_at
               * @property {string} updated_at
-              * @property {User | null} user
-              * @property {Thing[] | null} things
+              * @property {Thing | null} thing
               */
              """
   end
@@ -45,6 +43,8 @@ defmodule JsCodegenTest do
       field(:description, :string)
       field(:is_active, :boolean)
       field(:internal_field, :string)
+      has_many(:ones, JsCodegenTest.TestSchemaOne)
+      has_one(:ones_primary_thing, through: [:ones, :thing], where: [is_primary: true])
       timestamps()
     end
   end
@@ -63,7 +63,8 @@ defmodule JsCodegenTest do
               * @property {boolean} is_active
               * @property {string} inserted_at
               * @property {string} updated_at
-
+              * @property {TestSchemaOne[] | null} ones
+              * @property {Thing | null} ones_primary_thing
               */
              """
   end

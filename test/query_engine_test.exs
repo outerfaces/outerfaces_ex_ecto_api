@@ -1,9 +1,19 @@
 defmodule QueryEngineTest do
   use ExUnit.Case
 
+  alias Hex.API.User
   alias OuterfacesEctoApi.QueryEngine
   alias OuterfacesEctoApi.QueryEngine.QueryFilter
   alias OuterfacesEctoApi.QueryEngine.QuerySort
+
+  defmodule User do
+    use Ecto.Schema
+
+    schema "users" do
+      field(:name, :string)
+      timestamps()
+    end
+  end
 
   defmodule TestSchemaOne do
     use Ecto.Schema
@@ -12,7 +22,7 @@ defmodule QueryEngineTest do
       field(:name, :string)
       field(:value, :integer)
       field(:archived_at, :utc_datetime)
-      belongs_to(:user, OuterfacesEctoApiTest.User)
+      belongs_to(:user, QueryEngineTest.User)
       timestamps()
     end
   end
@@ -53,6 +63,30 @@ defmodule QueryEngineTest do
 
     assert built_active_query |> inspect() ==
              "{:ok, #Ecto.Query<from t0 in QueryEngineTest.TestSchemaOne, where: is_nil(t0.archived_at)>}"
+  end
+
+  test "build with association filtering" do
+    filter_specs = [
+      user_name: {
+        QueryFilter,
+        :by_association_field,
+        [:user],
+        :name,
+        :==,
+        _filter_with_nil_values = false,
+        _fallback_value = nil
+      }
+    ]
+    built_query =
+      QueryEngine.build(
+        TestSchemaOne,
+        filter_specs,
+        %{"filters" => %{"user_name" => "Alice"}},
+        _opts = []
+      )
+
+    assert built_query |> inspect() ==
+             "{:ok, #Ecto.Query<from t0 in QueryEngineTest.TestSchemaOne, left_join: u1 in QueryEngineTest.User, as: :user, on: t0.user_id == u1.id, where: u1.name == ^\"Alice\">}"
   end
 
   test "with sort specs" do
