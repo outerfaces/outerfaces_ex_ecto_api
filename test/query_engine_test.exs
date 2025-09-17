@@ -1,7 +1,6 @@
 defmodule QueryEngineTest do
   use ExUnit.Case
 
-  alias Hex.API.User
   alias OuterfacesEctoApi.QueryEngine
   alias OuterfacesEctoApi.QueryEngine.QueryFilter
   alias OuterfacesEctoApi.QueryEngine.QuerySort
