@@ -23,6 +23,7 @@ defmodule QueryEngineTest do
       field(:value, :integer)
       field(:archived_at, :utc_datetime)
       belongs_to(:user, QueryEngineTest.User)
+      belongs_to(:backup_user, QueryEngineTest.User)
       timestamps()
     end
   end
@@ -88,6 +89,123 @@ defmodule QueryEngineTest do
 
     assert built_query |> inspect() ==
              "{:ok, #Ecto.Query<from t0 in QueryEngineTest.TestSchemaOne, left_join: u1 in QueryEngineTest.User, as: :user, on: t0.user_id == u1.id, where: u1.name == ^\"Alice\">}"
+  end
+
+  test "with multiple filters using the same association" do
+    filter_specs = [
+      user_name: {
+        QueryFilter,
+        :by_association_field,
+        [:user],
+        :name,
+        :==,
+        _filter_with_nil_values = false,
+        _fallback_value = nil
+      },
+      user_id: {
+        QueryFilter,
+        :by_association_field,
+        [:user],
+        :id,
+        :==,
+        _filter_with_nil_values = false,
+        _fallback_value = nil
+      }
+    ]
+
+    built_query =
+      QueryEngine.build(
+        TestSchemaOne,
+        filter_specs,
+        %{"filters" => %{"user_name" => "Alice", "user_id" => 1}},
+        _opts = []
+      )
+
+    assert built_query |> inspect() ==
+             "{:ok, #Ecto.Query<from t0 in QueryEngineTest.TestSchemaOne, left_join: u1 in QueryEngineTest.User, as: :user, on: t0.user_id == u1.id, where: u1.id == ^1, where: u1.name == ^\"Alice\">}"
+  end
+
+  test "with multiple filters using different associations" do
+    filter_specs = [
+      user_name: {
+        QueryFilter,
+        :by_association_field,
+        [:user],
+        :name,
+        :==,
+        _filter_with_nil_values = false,
+        _fallback_value = nil
+      },
+      backup_user_id: {
+        QueryFilter,
+        :by_association_field,
+        [:backup_user],
+        :id,
+        :==,
+        _filter_with_nil_values = false,
+        _fallback_value = nil
+      }
+    ]
+
+    built_query =
+      QueryEngine.build(
+        TestSchemaOne,
+        filter_specs,
+        %{"filters" => %{"user_name" => "Alice", "backup_user_id" => 1}},
+        _opts = []
+      )
+
+    assert built_query |> inspect() ==
+             "{:ok, #Ecto.Query<from t0 in QueryEngineTest.TestSchemaOne, left_join: u1 in QueryEngineTest.User, as: :backup_user, on: t0.backup_user_id == u1.id, left_join: u2 in QueryEngineTest.User, as: :user, on: t0.user_id == u2.id, where: u1.id == ^1, where: u2.name == ^\"Alice\">}"
+  end
+
+  test "filtering on associations that do not exist" do
+    filter_specs = [
+      user_name: {
+        QueryFilter,
+        :by_association_field,
+        [:nonexistent],
+        :name,
+        :==,
+        _filter_with_nil_values = false,
+        _fallback_value = nil
+      }
+    ]
+
+    assert_raise ArgumentError,
+      "No valid binding found for expected alias: :nonexistent",
+      fn ->
+        QueryEngine.build(
+          TestSchemaOne,
+          filter_specs,
+          %{"filters" => %{"user_name" => "Alice"}},
+          _opts = []
+        )
+      end
+  end
+
+  test "filtering on fields that do not exist" do
+    filter_specs = [
+      nonexistent_field: {
+        QueryFilter,
+        :by_field,
+        :nonexistent_field,
+        :==,
+        _filter_with_nil_values = false,
+        _fallback_value = nil
+      }
+    ]
+
+    assert_raise ArgumentError,
+      "Field `nonexistent_field` does not exist on schema `QueryEngineTest.TestSchemaOne`",
+      fn ->
+        QueryEngine.build(
+          TestSchemaOne,
+          filter_specs,
+          %{"filters" => %{"nonexistent_field" => "value"}},
+          _opts = []
+        )
+      end
   end
 
   test "with sort specs" do
