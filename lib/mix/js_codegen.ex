@@ -1,4 +1,4 @@
-defmodule Mix.Tasks.OuterfacesEctoApiJsCodegen do
+defmodule Mix.Tasks.OuterfacesEctoApi.JsCodegen do
   use Mix.Task
 
   @shortdoc "Generates JSDoc types for api resources"

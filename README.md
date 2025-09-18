@@ -194,7 +194,7 @@ end
 ```elixir
 defmodule MyApp.MySchema do
   use Ecto.Schema
-  use ToadAudioOrchestratorWeb.Api.QuerySerializer
+  use OuterfacesEctoApi.QueryEngine.QuerySerializer
 
   # Override serialization behavior
   def serializer_skip_fields(_opts), do: [:internal_field, :password_hash]
