@@ -1,4 +1,14 @@
 defmodule QueryEngineTest do
+  @doc """
+  These tests for the QueryEngine module (though intentionally fragile by using `inspect`)
+  are for demonstration purposes to show how the QueryEngine can be used
+  to build Ecto queries with filtering and sorting capabilities.
+
+  These tests do not require a database connection and focus on the query construction logic.
+
+  The assertions use strings that are human readable rather than the AST,
+  in order to show the intended query structure more clearly.
+  """
   use ExUnit.Case
 
   alias OuterfacesEctoApi.QueryEngine
@@ -156,6 +166,69 @@ defmodule QueryEngineTest do
 
     assert built_query |> inspect() ==
              "{:ok, #Ecto.Query<from t0 in QueryEngineTest.TestSchemaOne, left_join: u1 in QueryEngineTest.User, as: :backup_user, on: t0.backup_user_id == u1.id, left_join: u2 in QueryEngineTest.User, as: :user, on: t0.user_id == u2.id, where: u1.id == ^1, where: u2.name == ^\"Alice\">}"
+  end
+
+  test "by association with a different operator" do
+    filter_specs = [
+      user_name: {
+        QueryFilter,
+        :by_association_field,
+        [:user],
+        :name,
+        :!=,
+        _filter_with_nil_values = false,
+        _fallback_value = nil
+      }
+    ]
+
+    built_query =
+      QueryEngine.build(
+        TestSchemaOne,
+        filter_specs,
+        %{"filters" => %{"user_name" => "Alice"}},
+        _opts = []
+      )
+
+    assert built_query |> inspect() ==
+             "{:ok, #Ecto.Query<from t0 in QueryEngineTest.TestSchemaOne, left_join: u1 in QueryEngineTest.User, as: :user, on: t0.user_id == u1.id, where: u1.name != ^\"Alice\">}"
+  end
+
+  test "multiple associations with a deep association and different operator" do
+    filter_specs = [
+      user_name_not: {
+        QueryFilter,
+        :by_association_field,
+        [:user],
+        :name,
+        :!=,
+        _filter_with_nil_values = false,
+        _fallback_value = nil
+      },
+      backup_user_creation_after: {
+        QueryFilter,
+        :by_association_field,
+        [:backup_user],
+        :inserted_at,
+        :>=,
+        _filter_with_nil_values = false,
+        _fallback_value = nil
+      }
+    ]
+
+    built_query =
+      QueryEngine.build(
+        TestSchemaOne,
+        filter_specs,
+        %{
+          "filters" => %{
+            "user_name_not" => "Alice",
+            "backup_user_creation_after" => "1970-01-01T00:00:00Z"
+          }
+        },
+        _opts = []
+      )
+    assert built_query |> inspect() ==
+             "{:ok, #Ecto.Query<from t0 in QueryEngineTest.TestSchemaOne, left_join: u1 in QueryEngineTest.User, as: :backup_user, on: t0.backup_user_id == u1.id, left_join: u2 in QueryEngineTest.User, as: :user, on: t0.user_id == u2.id, where: u1.inserted_at >= ^\"1970-01-01T00:00:00Z\", where: u2.name != ^\"Alice\">}"
   end
 
   test "filtering on associations that do not exist" do

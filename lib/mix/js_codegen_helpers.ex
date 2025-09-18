@@ -101,9 +101,9 @@ defmodule OuterfacesEctoApi.Mix.JsCodegenHelpers do
 
   def run_for_schema(%{schema: schema, controller_name: controller_name}, project_name)
       when is_binary(schema) and is_binary(controller_name) and is_binary(project_name) do
-    Mix.Task.reenable("outerfaces_ecto_api_js_codegen")
+    Mix.Task.reenable("outerfaces_ecto_api.js_codegen")
 
-    Mix.Task.run("outerfaces_ecto_api_js_codegen", [
+    Mix.Task.run("outerfaces_ecto_api.js_codegen", [
       "schema=#{schema}",
       "target_project_name=#{project_name}",
       "controller_module=#{controller_name}"
@@ -113,9 +113,9 @@ defmodule OuterfacesEctoApi.Mix.JsCodegenHelpers do
   def run_for_schema(%{schema: schema}, project_name)
       when is_binary(schema) and
              is_binary(project_name) do
-    Mix.Task.reenable("outerfaces_ecto_api_js_codegen")
+    Mix.Task.reenable("outerfaces_ecto_api.js_codegen")
 
-    Mix.Task.run("outerfaces_ecto_api_js_codegen", [
+    Mix.Task.run("outerfaces_ecto_api.js_codegen", [
       "schema=#{schema}",
       "target_project_name=#{project_name}"
     ])
