@@ -8,6 +8,49 @@ defmodule OuterfacesEctoApi.QueryEngine do
   alias OuterfacesEctoApi.QueryEngine.QueryBuilder
   alias OuterfacesEctoApi.QueryEngine.QueryPager
 
+  @type repo :: Ecto.Repo.t()
+  @type schema :: module()
+  @type preload :: atom() | {atom(), [preload()]}
+  @type filter_spec :: QueryBuilder.filter_spec()
+  @type sort_spec :: QueryBuilder.sort_by_spec()
+  @type params :: map()
+  @type pagination_info :: QueryPager.pagination_info()
+  @type paginated_success :: %{
+          :status => pos_integer(),
+          :results => %{
+            :data => [map()],
+            :page_info => pagination_info(),
+            :schema => String.t()
+          }
+        }
+  @type single_success :: %{
+          :status => pos_integer(),
+          :results => %{
+            :data => map(),
+            :schema => String.t(),
+            :id => integer()
+          }
+        }
+  @type error_response :: %{
+          :status => pos_integer(),
+          :results => %{
+            :data => nil,
+            :schema => String.t(),
+            optional(:page_info) => pagination_info() | nil,
+            optional(:id) => integer()
+          },
+          optional(:debug) => map()
+        }
+
+  @type all_response :: {:ok, paginated_success()} | {:error, error_response()}
+  @type get_response :: {:ok, single_success()} | {:error, error_response()}
+
+  @spec build(
+          schema(),
+          [filter_spec()],
+          params(),
+          Keyword.t()
+        ) :: {:ok, Ecto.Query.t()} | {:error, atom()}
   def build(schema, filters, params, opts \\ []) when is_map(params) and is_list(opts) do
     queryable = Keyword.get(opts, :base_queryable, schema)
     sort_specs = Keyword.get(opts, :sort_specs, [])
@@ -21,6 +64,15 @@ defmodule OuterfacesEctoApi.QueryEngine do
     )
   end
 
+  @spec all(
+          repo(),
+          schema(),
+          [preload()],
+          [filter_spec()],
+          [sort_spec()],
+          params(),
+          Keyword.t()
+        ) :: all_response()
   def all(
         repo,
         schema,
@@ -82,7 +134,7 @@ defmodule OuterfacesEctoApi.QueryEngine do
     end
   end
 
-  @spec do_apply_paging(Ecto.Query.t(), map()) ::
+  @spec do_apply_paging(Ecto.Query.t(), params()) ::
           {:ok, Ecto.Query.t()} | {:error, atom()}
   defp do_apply_paging(%Ecto.Query{} = query, params) do
     query
@@ -94,7 +146,7 @@ defmodule OuterfacesEctoApi.QueryEngine do
     {:error, :query_all_construction_failure}
   end
 
-  @spec do_query_all(Ecto.Repo.t(), Ecto.Query.t()) :: {:ok, [Ecto.Schema.t()]} | {:error, atom()}
+  @spec do_query_all(repo(), Ecto.Query.t()) :: {:ok, [Ecto.Schema.t()]} | {:error, atom()}
   defp do_query_all(repo, query) do
     try do
       query
@@ -113,9 +165,9 @@ defmodule OuterfacesEctoApi.QueryEngine do
   end
 
   @spec do_preload_and_serialize(
-          repo :: Ecto.Repo.t(),
+          repo(),
           Ecto.Queryable.t() | [Ecto.Schema.t()],
-          [String.t()],
+          [preload()],
           Keyword.t()
         ) ::
           {:ok, [map()]} | {:error, atom()}
@@ -128,7 +180,7 @@ defmodule OuterfacesEctoApi.QueryEngine do
     end
   end
 
-  @spec do_aggregate_count(Ecto.Repo.t(), Ecto.Query.t()) ::
+  @spec do_aggregate_count(repo(), Ecto.Query.t()) ::
           {:ok, integer()} | {:error, atom()}
   defp do_aggregate_count(repo, %Ecto.Query{} = query) do
     try do
@@ -149,8 +201,8 @@ defmodule OuterfacesEctoApi.QueryEngine do
     end
   end
 
-  @spec get(Ecto.Repo.t(), Ecto.Schema.t(), [atom()], binary() | integer(), Keyword.t()) ::
-          {:ok, map()} | {:error, map()}
+  @spec get(repo(), schema(), [preload()], binary() | integer(), Keyword.t()) ::
+          get_response()
   def get(repo, schema, id, preloads \\ [], opts \\ [])
 
   def get(repo, schema, id, preloads, opts) when is_binary(id) do
@@ -213,7 +265,7 @@ defmodule OuterfacesEctoApi.QueryEngine do
     |> Atom.to_string()
   end
 
-  @spec do_get(Ecto.Repo.t(), Ecto.Schema.t(), binary() | integer()) ::
+  @spec do_get(repo(), schema(), binary() | integer()) ::
           {:ok, map()} | {:error, atom()}
   defp do_get(repo, schema, id) when is_binary(id) do
     do_get(repo, schema, String.to_integer(id))

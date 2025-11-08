@@ -13,6 +13,8 @@ defmodule OuterfacesEctoApi.QueryEngine.QueryBuilder do
           module(),
           # Function
           atom(),
+          # Field name
+          atom(),
           # Operation {truthy arg, falsy arg} | operation
           {atom(), atom()} | atom(),
           # run filter with nil values
@@ -28,6 +30,8 @@ defmodule OuterfacesEctoApi.QueryEngine.QueryBuilder do
           atom(),
           # Binding list or []
           [atom()],
+          # Field name
+          atom(),
           # Operation(s)
           {atom(), atom()} | atom(),
           # run filter with nil values

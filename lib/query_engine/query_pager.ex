@@ -1,6 +1,15 @@
 defmodule OuterfacesEctoApi.QueryEngine.QueryPager do
   import Ecto.Query
 
+  @type pagination_info :: %{
+          total_count: non_neg_integer(),
+          total_pages: pos_integer(),
+          has_next_page: boolean(),
+          has_previous_page: boolean(),
+          limit: non_neg_integer(),
+          offset: non_neg_integer()
+        }
+
   @doc """
   Applies ordering, limit, and offset to a given query.
 
@@ -11,6 +20,7 @@ defmodule OuterfacesEctoApi.QueryEngine.QueryPager do
   Example usage:
     QueryPager.apply_paging(query, %{"limit" => 10, "offset" => 20})
   """
+  @spec apply_paging(Ecto.Query.t(), map()) :: Ecto.Query.t()
   def apply_paging(query, params) do
     params = Map.get(params, "query", "{}") |> Jason.decode!()
 
@@ -31,6 +41,7 @@ defmodule OuterfacesEctoApi.QueryEngine.QueryPager do
 
   defp apply_offset(query, _), do: query
 
+  @spec compute_pagination(map(), non_neg_integer()) :: pagination_info()
   def compute_pagination(params, total_count) do
     params = Map.get(params, "query", "{}") |> Jason.decode!()
     limit = parse_integer(params["limit"]) || 10

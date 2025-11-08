@@ -227,6 +227,7 @@ defmodule QueryEngineTest do
         },
         _opts = []
       )
+
     assert built_query |> inspect() ==
              "{:ok, #Ecto.Query<from t0 in QueryEngineTest.TestSchemaOne, left_join: u1 in QueryEngineTest.User, as: :backup_user, on: t0.backup_user_id == u1.id, left_join: u2 in QueryEngineTest.User, as: :user, on: t0.user_id == u2.id, where: u1.inserted_at >= ^\"1970-01-01T00:00:00Z\", where: u2.name != ^\"Alice\">}"
   end
@@ -245,15 +246,15 @@ defmodule QueryEngineTest do
     ]
 
     assert_raise ArgumentError,
-      "No valid binding found for expected alias: :nonexistent",
-      fn ->
-        QueryEngine.build(
-          TestSchemaOne,
-          filter_specs,
-          %{"filters" => %{"user_name" => "Alice"}},
-          _opts = []
-        )
-      end
+                 "No valid binding found for expected alias: :nonexistent",
+                 fn ->
+                   QueryEngine.build(
+                     TestSchemaOne,
+                     filter_specs,
+                     %{"filters" => %{"user_name" => "Alice"}},
+                     _opts = []
+                   )
+                 end
   end
 
   test "filtering on fields that do not exist" do
@@ -269,15 +270,15 @@ defmodule QueryEngineTest do
     ]
 
     assert_raise ArgumentError,
-      "Field `nonexistent_field` does not exist on schema `QueryEngineTest.TestSchemaOne`",
-      fn ->
-        QueryEngine.build(
-          TestSchemaOne,
-          filter_specs,
-          %{"filters" => %{"nonexistent_field" => "value"}},
-          _opts = []
-        )
-      end
+                 "Field `nonexistent_field` does not exist on schema `QueryEngineTest.TestSchemaOne`",
+                 fn ->
+                   QueryEngine.build(
+                     TestSchemaOne,
+                     filter_specs,
+                     %{"filters" => %{"nonexistent_field" => "value"}},
+                     _opts = []
+                   )
+                 end
   end
 
   test "with sort specs" do
