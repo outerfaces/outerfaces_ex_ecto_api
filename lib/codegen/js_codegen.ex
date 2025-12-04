@@ -67,9 +67,9 @@ defmodule OuterfacesEctoApi.Codegen.JsCodegen do
             fields_defs,
             index_association_defs
           )
-          else
-            base
-          end
+      else
+        base
+      end
 
     if controller_has_show_method do
       base <>
@@ -86,8 +86,8 @@ defmodule OuterfacesEctoApi.Codegen.JsCodegen do
   defp generate_index_typedef(
          schema_name,
          fields_defs,
-          index_association_defs
-  ) do
+         index_association_defs
+       ) do
     """
     /**
      * @typedef {Object} #{schema_name}IndexData

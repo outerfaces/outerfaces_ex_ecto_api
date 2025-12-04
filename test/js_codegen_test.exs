@@ -86,6 +86,8 @@ defmodule JsCodegenTest do
   defmodule TestController do
     def index_preloads(), do: [:thing]
     def show_preloads(), do: [{:thing, [:disposition]}, :other_thing]
+    def index(_a, _b), do: :ok
+    def show(_a, _b), do: :ok
   end
 
   test "with a controller" do
@@ -117,7 +119,7 @@ defmodule JsCodegenTest do
               * @property {number} [limit] - Maximum number of records to return
               * @property {number} [offset] - Offset for the query
               *
-             */
+              */
 
              /**
               * @typedef {Object} FetchTestSchemaOneIndexQueryResult
@@ -145,9 +147,9 @@ defmodule JsCodegenTest do
              /**
               * @typedef {Object} FetchTestSchemaOneShowQueryResult
               * @property {number} status
-              * @property {Object} results
-              * @property {TestSchemaOneShowData} results.data
-              * @property {string} results.schema
+              * @property {Object} result
+              * @property {TestSchemaOneShowData} result.data
+              * @property {string} result.schema
               */
              """
   end
