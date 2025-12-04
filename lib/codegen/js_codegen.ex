@@ -51,6 +51,43 @@ defmodule OuterfacesEctoApi.Codegen.JsCodegen do
     show_association_defs =
       build_association_defs(schema_module, controller_module, :show_preloads, 0, [])
 
+    controller_has_index_method =
+      function_exported?(controller_module, :index, 2)
+
+    controller_has_show_method =
+      function_exported?(controller_module, :show, 2)
+
+    base = ""
+
+    base =
+      if controller_has_index_method do
+        base <>
+          generate_index_typedef(
+            schema_name,
+            fields_defs,
+            index_association_defs
+          )
+          else
+            base
+          end
+
+    if controller_has_show_method do
+      base <>
+        generate_show_typedef(
+          schema_name,
+          fields_defs,
+          show_association_defs
+        )
+    else
+      base
+    end
+  end
+
+  defp generate_index_typedef(
+         schema_name,
+         fields_defs,
+          index_association_defs
+  ) do
     """
     /**
      * @typedef {Object} #{schema_name}IndexData
@@ -65,7 +102,7 @@ defmodule OuterfacesEctoApi.Codegen.JsCodegen do
      * @property {number} [limit] - Maximum number of records to return
      * @property {number} [offset] - Offset for the query
      *
-    */
+     */
 
     /**
      * @typedef {Object} Fetch#{schema_name}IndexQueryResult
@@ -76,6 +113,15 @@ defmodule OuterfacesEctoApi.Codegen.JsCodegen do
      * @property {PageInfo} results.page_info
      */
 
+    """
+  end
+
+  defp generate_show_typedef(
+         schema_name,
+         fields_defs,
+         show_association_defs
+       ) do
+    """
     /**
      * @typedef {Object} #{schema_name}ShowData
     #{fields_defs}
@@ -85,9 +131,9 @@ defmodule OuterfacesEctoApi.Codegen.JsCodegen do
     /**
      * @typedef {Object} Fetch#{schema_name}ShowQueryResult
      * @property {number} status
-     * @property {Object} results
-     * @property {#{schema_name}ShowData} results.data
-     * @property {string} results.schema
+     * @property {Object} result
+     * @property {#{schema_name}ShowData} result.data
+     * @property {string} result.schema
      */
     """
   end
