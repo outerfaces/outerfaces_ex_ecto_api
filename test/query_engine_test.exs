@@ -327,4 +327,225 @@ defmodule QueryEngineTest do
     assert built_default_sorted_query |> inspect() ==
              "{:ok, #Ecto.Query<from t0 in QueryEngineTest.TestSchemaOne, order_by: [desc: t0.created_at]>}"
   end
+
+  test "with sort specs on associations" do
+    sort_specs = [
+      {
+        :user_name,
+        {
+          QuerySort,
+          :by_association_field,
+          [:user],
+          :name,
+          :asc,
+          _default = true
+        }
+      }
+    ]
+
+    built_sorted_query =
+      QueryEngine.build(
+        TestSchemaOne,
+        _filter_specs = [],
+        %{},
+        sort_specs: sort_specs
+      )
+
+    assert built_sorted_query |> inspect() ==
+             "{:ok, #Ecto.Query<from t0 in QueryEngineTest.TestSchemaOne, left_join: u1 in QueryEngineTest.User, as: :user, on: t0.user_id == u1.id, order_by: [asc: u1.name]>}"
+  end
+
+  test "with default filter value applied" do
+    filter_specs = [
+      {
+        :is_active,
+        {
+          QueryFilter,
+          :by_field,
+          :archived_at,
+          {:is_nil, :not_nil},
+          _filter_with_nil_values = false,
+          _fallback_value = true
+        }
+      }
+    ]
+
+    # When filter is not provided, default should be applied
+    built_query_with_default =
+      QueryEngine.build(
+        TestSchemaOne,
+        filter_specs,
+        %{},
+        _opts = []
+      )
+
+    assert built_query_with_default |> inspect() ==
+             "{:ok, #Ecto.Query<from t0 in QueryEngineTest.TestSchemaOne, where: is_nil(t0.archived_at)>}"
+  end
+
+  test "with association filter and association sort together" do
+    filter_specs = [
+      user_name: {
+        QueryFilter,
+        :by_association_field,
+        [:user],
+        :name,
+        :==,
+        _filter_with_nil_values = false,
+        _fallback_value = nil
+      }
+    ]
+
+    sort_specs = [
+      {
+        :user_name,
+        {
+          QuerySort,
+          :by_association_field,
+          [:user],
+          :name,
+          :asc,
+          _default = false
+        }
+      }
+    ]
+
+    built_query =
+      QueryEngine.build(
+        TestSchemaOne,
+        filter_specs,
+        %{"filters" => %{"user_name" => "Alice"}, "sort" => ["user_name:desc"]},
+        sort_specs: sort_specs
+      )
+
+    assert built_query |> inspect() ==
+             "{:ok, #Ecto.Query<from t0 in QueryEngineTest.TestSchemaOne, left_join: u1 in QueryEngineTest.User, as: :user, on: t0.user_id == u1.id, where: u1.name == ^\"Alice\", order_by: [desc: u1.name]>}"
+  end
+
+  test "with default sort on association without explicit sort param" do
+    sort_specs = [
+      {
+        :user_name,
+        {
+          QuerySort,
+          :by_association_field,
+          [:user],
+          :name,
+          :asc,
+          _default = true
+        }
+      },
+      {
+        :backup_user_name,
+        {
+          QuerySort,
+          :by_association_field,
+          [:backup_user],
+          :name,
+          :desc,
+          _default = false
+        }
+      }
+    ]
+
+    # Should apply default sort and create necessary join
+    built_query =
+      QueryEngine.build(
+        TestSchemaOne,
+        _filter_specs = [],
+        %{},
+        sort_specs: sort_specs
+      )
+
+    assert built_query |> inspect() ==
+             "{:ok, #Ecto.Query<from t0 in QueryEngineTest.TestSchemaOne, left_join: u1 in QueryEngineTest.User, as: :user, on: t0.user_id == u1.id, order_by: [asc: u1.name]>}"
+  end
+
+  test "with multiple association sorts using different associations" do
+    sort_specs = [
+      {
+        :user_name,
+        {
+          QuerySort,
+          :by_association_field,
+          [:user],
+          :name,
+          :asc,
+          _default = false
+        }
+      },
+      {
+        :backup_user_name,
+        {
+          QuerySort,
+          :by_association_field,
+          [:backup_user],
+          :name,
+          :desc,
+          _default = false
+        }
+      }
+    ]
+
+    built_query =
+      QueryEngine.build(
+        TestSchemaOne,
+        _filter_specs = [],
+        %{"sort" => ["user_name:asc", "backup_user_name:desc"]},
+        sort_specs: sort_specs
+      )
+
+    assert built_query |> inspect() ==
+             "{:ok, #Ecto.Query<from t0 in QueryEngineTest.TestSchemaOne, left_join: u1 in QueryEngineTest.User, as: :backup_user, on: t0.backup_user_id == u1.id, left_join: u2 in QueryEngineTest.User, as: :user, on: t0.user_id == u2.id, order_by: [asc: u2.name], order_by: [desc: u1.name]>}"
+  end
+
+  test "with filter without default value (5-tuple format)" do
+    filter_specs = [
+      {
+        :name,
+        {
+          QueryFilter,
+          :by_field,
+          :name,
+          :==,
+          _filter_with_nil_values = false
+        }
+      }
+    ]
+
+    built_query =
+      QueryEngine.build(
+        TestSchemaOne,
+        filter_specs,
+        %{"filters" => %{"name" => "test"}},
+        _opts = []
+      )
+
+    assert built_query |> inspect() ==
+             "{:ok, #Ecto.Query<from t0 in QueryEngineTest.TestSchemaOne, where: t0.name == ^\"test\">}"
+  end
+
+  test "with association filter without default value (6-tuple format)" do
+    filter_specs = [
+      user_name: {
+        QueryFilter,
+        :by_association_field,
+        [:user],
+        :name,
+        :==,
+        _filter_with_nil_values = false
+      }
+    ]
+
+    built_query =
+      QueryEngine.build(
+        TestSchemaOne,
+        filter_specs,
+        %{"filters" => %{"user_name" => "Bob"}},
+        _opts = []
+      )
+
+    assert built_query |> inspect() ==
+             "{:ok, #Ecto.Query<from t0 in QueryEngineTest.TestSchemaOne, left_join: u1 in QueryEngineTest.User, as: :user, on: t0.user_id == u1.id, where: u1.name == ^\"Bob\">}"
+  end
 end

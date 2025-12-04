@@ -129,7 +129,7 @@ defmodule OuterfacesEctoApi.QueryEngine.QueryBuilder do
 
       join_info =
         extract_needed_joins(filter_specs, schema, filter_params) ++
-          extract_needed_joins(effective_sort, schema, %{})
+          extract_needed_joins_from_sorts(effective_sort, schema)
 
       queryable =
         case join_info do
@@ -485,6 +485,11 @@ defmodule OuterfacesEctoApi.QueryEngine.QueryBuilder do
               apply(mod, func, [acc, literal, field, effective_operator])
           end
         end
+
+      # Handle 5-tuple field format without default (no-op since no default to apply)
+      {filter_key, {_mod, _func, _field, _operator, _allow_nil}}, acc
+      when is_atom(filter_key) ->
+        acc
     end)
   end
 
@@ -492,14 +497,14 @@ defmodule OuterfacesEctoApi.QueryEngine.QueryBuilder do
     filter_specs
     |> Enum.reduce([], fn
       {filter_key, {_mod, _func, binding_list, _field, _operator, allow_nil, _default}}, acc
-      when is_list(binding_list) and is_binary(filter_key) ->
-        filter_value = Map.get(filter_params, filter_key)
+      when is_list(binding_list) and is_atom(filter_key) ->
+        filter_value = Map.get(filter_params, Atom.to_string(filter_key))
 
         cond do
           is_nil(filter_value) and not allow_nil ->
             acc
 
-          not Map.has_key?(filter_params, filter_key) ->
+          not Map.has_key?(filter_params, Atom.to_string(filter_key)) ->
             acc
 
           true ->
@@ -511,14 +516,14 @@ defmodule OuterfacesEctoApi.QueryEngine.QueryBuilder do
         end
 
       {filter_key, {_mod, _func, binding_list, _field, _operator, allow_nil}}, acc
-      when is_list(binding_list) and is_binary(filter_key) ->
-        filter_value = Map.get(filter_params, filter_key)
+      when is_list(binding_list) and is_atom(filter_key) ->
+        filter_value = Map.get(filter_params, Atom.to_string(filter_key))
 
         cond do
           is_nil(filter_value) and not allow_nil ->
             acc
 
-          not Map.has_key?(filter_params, filter_key) ->
+          not Map.has_key?(filter_params, Atom.to_string(filter_key)) ->
             acc
 
           true ->
@@ -530,11 +535,11 @@ defmodule OuterfacesEctoApi.QueryEngine.QueryBuilder do
         end
 
       {filter_key, {_mod, :by_field, _field, _operator, _allow_nil, _default}}, acc
-      when is_binary(filter_key) ->
+      when is_atom(filter_key) ->
         acc
 
       {filter_key, {_mod, :by_field, _field, _operator, _allow_nil}}, acc
-      when is_binary(filter_key) ->
+      when is_atom(filter_key) ->
         acc
 
       # Sort specs - always extract joins regardless of params
@@ -560,6 +565,26 @@ defmodule OuterfacesEctoApi.QueryEngine.QueryBuilder do
 
       unknown, acc ->
         Logger.warning("Unexpected filter / sort spec format: #{inspect(unknown)}")
+        acc
+    end)
+    |> Enum.uniq()
+    |> Enum.flat_map(fn binding_list ->
+      [expand_association_chain(schema, binding_list, [])]
+    end)
+  end
+
+  defp extract_needed_joins_from_sorts(effective_sorts, schema) do
+    effective_sorts
+    |> Enum.reduce([], fn
+      {_sort_key, {_mod, _func, binding_list, _field, _direction, _default}}, acc
+      when is_list(binding_list) ->
+        [binding_list | acc]
+
+      {_sort_key, {_mod, _func, binding_list, _field, _direction}}, acc
+      when is_list(binding_list) ->
+        [binding_list | acc]
+
+      _, acc ->
         acc
     end)
     |> Enum.uniq()
