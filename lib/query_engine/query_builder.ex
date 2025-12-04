@@ -8,37 +8,66 @@ defmodule OuterfacesEctoApi.QueryEngine.QueryBuilder do
 
   require Logger
 
-  @type field_filter_definition :: {
-          # Module
-          module(),
-          # Function
-          atom(),
-          # Field name
-          atom(),
-          # Operation {truthy arg, falsy arg} | operation
-          {atom(), atom()} | atom(),
-          # run filter with nil values
-          boolean(),
-          # defualt value or default filter definition
-          any() | {module(), atom(), list()}
-        }
+  @type field_filter_definition ::
+          {
+            # Module
+            module(),
+            # Function
+            atom(),
+            # Field name
+            atom(),
+            # Operation {truthy arg, falsy arg} | operation
+            {atom(), atom()} | atom(),
+            # run filter with nil values
+            boolean()
+          }
+          | {
+              # Module
+              module(),
+              # Function
+              atom(),
+              # Field name
+              atom(),
+              # Operation {truthy arg, falsy arg} | operation
+              {atom(), atom()} | atom(),
+              # run filter with nil values
+              boolean(),
+              # default value or default filter definition
+              any()
+            }
 
-  @type association_field_filter_definition :: {
-          # Module
-          module(),
-          # Function
-          atom(),
-          # Binding list or []
-          [atom()],
-          # Field name
-          atom(),
-          # Operation(s)
-          {atom(), atom()} | atom(),
-          # run filter with nil values
-          boolean(),
-          # defualt value or default filter definition
-          any() | {module(), atom(), list()}
-        }
+  @type association_field_filter_definition ::
+          {
+            # Module
+            module(),
+            # Function
+            atom(),
+            # Binding list or []
+            [atom()],
+            # Field name
+            atom(),
+            # Operation(s)
+            {atom(), atom()} | atom(),
+            # run filter with nil values
+            boolean()
+          }
+          | {
+              # Module
+              module(),
+              # Function
+              atom(),
+              # Binding list or []
+              [atom()],
+              # Field name
+              atom(),
+              # Operation(s)
+              {atom(), atom()} | atom(),
+              # run filter with nil values
+              boolean(),
+              # default value or default filter definition
+              any()
+            }
+
   @type filter_spec :: {
           # Filter key
           atom(),
@@ -269,7 +298,56 @@ defmodule OuterfacesEctoApi.QueryEngine.QueryBuilder do
                   "No valid binding found for expected alias: #{inspect(expected_alias)}"
         end
 
+      {_, {mod, func, binding_list, field, operator, allow_nil}} when is_list(binding_list) ->
+        validate_filter_field!(detect_target_schema(queryable, binding_list), field)
+        resolved_operator = resolve_operator(operator, filter_value)
+
+        expected_alias =
+          binding_list
+          |> Enum.map(&Atom.to_string/1)
+          |> Enum.join("_")
+          |> String.to_atom()
+
+        case QueryJoiner.NamedBinding.find(queryable, expected_alias) do
+          {binding_index, _join} ->
+            cond do
+              is_nil(filter_value) and allow_nil ->
+                apply(mod, func, [queryable, nil, binding_index, field, resolved_operator])
+
+              is_nil(filter_value) ->
+                queryable
+
+              true ->
+                apply(mod, func, [
+                  queryable,
+                  filter_value,
+                  binding_index,
+                  field,
+                  resolved_operator
+                ])
+            end
+
+          nil ->
+            raise ArgumentError,
+                  "No valid binding found for expected alias: #{inspect(expected_alias)}"
+        end
+
       {_, {mod, func, field, operator, allow_nil, _default}} when is_atom(field) ->
+        validate_filter_field!(queryable, field)
+        resolved_operator = resolve_operator(operator, filter_value)
+
+        cond do
+          is_nil(filter_value) and allow_nil ->
+            apply(mod, func, [queryable, nil, field, resolved_operator])
+
+          is_nil(filter_value) ->
+            queryable
+
+          true ->
+            apply(mod, func, [queryable, filter_value, field, resolved_operator])
+        end
+
+      {_, {mod, func, field, operator, allow_nil}} when is_atom(field) ->
         validate_filter_field!(queryable, field)
         resolved_operator = resolve_operator(operator, filter_value)
 
@@ -413,14 +491,15 @@ defmodule OuterfacesEctoApi.QueryEngine.QueryBuilder do
   defp extract_needed_joins(filter_specs, schema, filter_params) do
     filter_specs
     |> Enum.reduce([], fn
-      {filter_key, {_mod, _func, binding_list, _field, _operator, allow_nil, _default}}, acc ->
-        filter_value = Map.get(filter_params, Atom.to_string(filter_key))
+      {filter_key, {_mod, _func, binding_list, _field, _operator, allow_nil, _default}}, acc
+      when is_list(binding_list) and is_binary(filter_key) ->
+        filter_value = Map.get(filter_params, filter_key)
 
         cond do
           is_nil(filter_value) and not allow_nil ->
             acc
 
-          not Map.has_key?(filter_params, Atom.to_string(filter_key)) ->
+          not Map.has_key?(filter_params, filter_key) ->
             acc
 
           true ->
@@ -431,9 +510,34 @@ defmodule OuterfacesEctoApi.QueryEngine.QueryBuilder do
             end
         end
 
-      {_filter_key, {_mod, :by_field, _field, _operator, _allow_nil, _default}}, acc ->
+      {filter_key, {_mod, _func, binding_list, _field, _operator, allow_nil}}, acc
+      when is_list(binding_list) and is_binary(filter_key) ->
+        filter_value = Map.get(filter_params, filter_key)
+
+        cond do
+          is_nil(filter_value) and not allow_nil ->
+            acc
+
+          not Map.has_key?(filter_params, filter_key) ->
+            acc
+
+          true ->
+            case binding_list do
+              list when is_list(list) -> [list | acc]
+              atom when is_atom(atom) -> [[atom] | acc]
+              _ -> acc
+            end
+        end
+
+      {filter_key, {_mod, :by_field, _field, _operator, _allow_nil, _default}}, acc
+      when is_binary(filter_key) ->
         acc
 
+      {filter_key, {_mod, :by_field, _field, _operator, _allow_nil}}, acc
+      when is_binary(filter_key) ->
+        acc
+
+      # Sort specs - always extract joins regardless of params
       {_sort_key, {_mod, _func, binding_list, _field, _direction, _default}}, acc ->
         case binding_list do
           list when is_list(list) -> [list | acc]
