@@ -64,6 +64,8 @@ defmodule OuterfacesEctoApi.Mix.JsCodegenHelpers do
   @spec base_js_typedefs :: String.t()
   def base_js_typedefs do
     """
+    export {};
+
     /**
       * @typedef {Object} PageInfo
       * @property {number} limit
