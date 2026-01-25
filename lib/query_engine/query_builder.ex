@@ -380,21 +380,18 @@ defmodule OuterfacesEctoApi.QueryEngine.QueryBuilder do
     end
   end
 
-  defp detect_target_schema(queryable, [assoc | _]) do
+  defp detect_target_schema(queryable, binding_list) when is_list(binding_list) do
     base_schema = detect_target_schema(queryable, [])
 
-    case base_schema.__schema__(:association, assoc) do
-      %Ecto.Association.Has{related: schema} ->
-        schema
-
-      %Ecto.Association.BelongsTo{related: schema} ->
-        schema
-
-      %Ecto.Association.HasThrough{through: through_list} ->
-        List.last(through_list) |> detect_target_schema(queryable)
-
-      nil ->
+    case expand_association_chain(base_schema, binding_list, []) do
+      [] ->
         base_schema
+
+      steps ->
+        case List.last(steps) do
+          {_, related_schema, _, _} -> related_schema
+          _ -> base_schema
+        end
     end
   end
 
