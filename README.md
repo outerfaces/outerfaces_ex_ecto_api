@@ -3,7 +3,25 @@
 [![Hex.pm](https://img.shields.io/hexpm/v/outerfaces_ex_ecto_api.svg)](https://hex.pm/packages/outerfaces_ex_ecto_api)
 [![HexDocs](https://img.shields.io/badge/hex-docs-blue.svg)](https://hexdocs.pm/outerfaces_ex_ecto_api)
 
-A comprehensive, declarative query building and serialization system for Phoenix/Ecto applications that supports complex filtering, sorting, pagination, and deep association preloading through JSON API requests.
+A comprehensive, spec-driven query building and serialization system for Phoenix/Ecto applications that supports complex filtering, sorting, pagination, and deep association preloading through JSON API requests.
+
+## Key Features
+
+- **Specs as Data**: Filter and sort specifications are first-class data structures that can be stored, composed, and generated at runtime
+- **Deep Association Support**: Filter and sort on nested associations up to 21 levels deep with automatic join management
+- **Declarative API**: Define what queries are possible, not how to build them
+- **Smart Defaults**: Automatic fallback filters for tenant scoping, soft deletes, and security defaults
+- **JSON-Native**: Clean request/response format designed for frontend consumption
+
+## Philosophy
+
+Most APIs end up in one of two places: a handful of rigid REST endpoints that never quite fit, or a GraphQL schema that tries to be everything to everyone.
+
+This library takes a different path. Filter and sort specs are just data—tuples you can define, store, compose, and pass around. Want a `/api/active-users-by-region` endpoint? Define the specs, wire it up, ship it. Need a different view for a different client? New specs, new endpoint, minimal ceremony.
+
+Over time you build up a collection of query patterns that map to how your domain actually gets used. It's oddly satisfying to see them accumulate—each one a small, focused tool rather than another parameter on a god endpoint.
+
+The bet is that many specific endpoints are better than one flexible endpoint. Specs make spinning up new ones cheap enough that you actually do it.
 
 ## Architecture Overview
 
@@ -34,11 +52,14 @@ The main entry point that orchestrates the entire query pipeline. Provides two m
 - `all/7` - For index endpoints with pagination
 - `get/5` - For show endpoints
 
-### QueryBuilder  
+### QueryBuilder
 Parses JSON query parameters and builds Ecto queries using declarative filter and sort specifications. Handles a sophisticated two-phase filtering process:
 
 1. **Explicit Filters**: Applies filters explicitly provided in the JSON request
 2. **Default Filters**: Applies default/fallback filters for any missing filter specifications
+
+### QueryJoiner
+Manages association joins with automatic deduplication and nested alias tracking. Uses runtime functions (not macros) to allow fully dynamic join chain construction from runtime-computed specifications.
 
 ### QueryFilter
 Applies filters to queries with support for:
@@ -54,7 +75,7 @@ Generates dynamic Ecto query expressions for different binding arities. Handles 
 Manages preloading of associations and delegates serialization to individual schemas.
 
 ### QuerySerializer
-Provides a macro for schemas to define their serialization behavior with hooks for custom field processing.
+Provides a `use` macro for schemas to define their serialization behavior with hooks for custom field processing.
 
 ## Usage
 
@@ -371,3 +392,130 @@ end
 # Filter by nested association fields
 {:user_profile_type, {QueryFilter, :by_association_field, [:user, :profile], :type, :==, false, nil}}
 ```
+
+### Dynamic Spec Construction
+
+Unlike most query builders that require compile-time definitions, specs here are plain data that can be constructed at runtime:
+
+```elixir
+# Build specs dynamically from configuration or database
+def build_filter_specs(schema, config) do
+  Enum.map(config.filterable_fields, fn field_config ->
+    {field_config.key,
+     {QueryFilter, :by_field, field_config.column, field_config.operator, false, nil}}
+  end)
+end
+
+# Generate specs via schema introspection
+def auto_filter_specs(schema) do
+  schema.__schema__(:fields)
+  |> Enum.map(fn field ->
+    {field, {QueryFilter, :by_field, field, :==, false, nil}}
+  end)
+end
+
+# Compose specs from multiple sources
+def merged_specs(base_specs, tenant_specs, user_specs) do
+  base_specs ++ tenant_specs ++ user_specs
+end
+```
+
+This enables:
+- Loading filter/sort capabilities from a database
+- Auto-generating query APIs from schema introspection
+- Multi-tenant configurations with per-tenant queryable fields
+- Plugin systems where modules contribute their own specs
+
+## JavaScript Codegen
+
+The library includes a Mix task to generate JSDoc type definitions from your Ecto schemas, keeping frontend types in sync with your API.
+
+### Basic Usage
+
+```bash
+mix outerfaces_ex_ecto_api.js_codegen schema=MyApp.User target_project_name=my_frontend
+```
+
+Generates type definitions based on schema fields and associations:
+
+```javascript
+/**
+ * @typedef {Object} User
+ * @property {number} id
+ * @property {string} name
+ * @property {string} email
+ * @property {string} inserted_at
+ * @property {string} updated_at
+ * @property {Organization | null} organization
+ */
+```
+
+### Controller-Aware Generation
+
+When you specify a controller, it generates endpoint-specific types based on what's actually preloaded for index vs show:
+
+```bash
+mix outerfaces_ex_ecto_api.js_codegen \
+  schema=MyApp.User \
+  controller_module=MyAppWeb.UserController \
+  target_project_name=my_frontend
+```
+
+This reads `index_preloads/0` and `show_preloads/0` from your controller to generate accurate types for each endpoint. (The `/0` convention is simple but could be extended to `/1` variants that accept context for conditional preloads, role-based field visibility, etc.)
+
+```javascript
+/**
+ * @typedef {Object} UserIndexData
+ * @property {number} id
+ * @property {string} name
+ * @property {Organization | null} organization
+ */
+
+/**
+ * @typedef {Object} FetchUserIndexQueryParams
+ * @property {Object} [filters] - Filters to apply to the query
+ * @property {string[]} [sort] - Sort order. Format: ['field:asc', 'field:desc']
+ * @property {number} [limit] - Maximum records to return
+ * @property {number} [offset] - Offset for pagination
+ */
+
+/**
+ * @typedef {Object} FetchUserIndexQueryResult
+ * @property {number} status
+ * @property {Object} results
+ * @property {UserIndexData[]} results.data
+ * @property {string} results.schema
+ * @property {PageInfo} results.page_info
+ */
+
+/**
+ * @typedef {Object} UserShowData
+ * @property {number} id
+ * @property {string} name
+ * @property {string} email
+ * @property {Organization | null} organization
+ * @property {Profile | null} profile
+ */
+
+/**
+ * @typedef {Object} FetchUserShowQueryResult
+ * @property {number} status
+ * @property {Object} result
+ * @property {UserShowData} result.data
+ * @property {string} result.schema
+ */
+```
+
+### Skipping Fields
+
+If your schema uses `QuerySerializer`, fields listed in `serializer_skip_fields/1` are automatically excluded from the generated types:
+
+```elixir
+defmodule MyApp.User do
+  use OuterfacesEctoApi.QueryEngine.QuerySerializer
+
+  def serializer_skip_fields(_opts), do: [:password_hash, :internal_notes]
+end
+```
+
+This keeps sensitive or internal fields out of your frontend type definitions.

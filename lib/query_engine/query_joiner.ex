@@ -1,77 +1,50 @@
 defmodule OuterfacesEctoApi.QueryEngine.QueryJoiner do
   @moduledoc """
-  Provides macros for dynamically constructing Ecto queries with filters and nested joins.
+  Provides functions for dynamically constructing Ecto queries with filters and nested joins.
   """
   import Ecto.Query
 
   @spec ensure_joins(Ecto.Query.t(), list({atom(), module(), atom(), atom()})) :: Ecto.Query.t()
-  defmacro ensure_joins(query, chain) do
-    quote do
-      Enum.reduce(unquote(chain), {unquote(query), nil}, fn
-        {assoc_name, related_schema, owner_key, related_key}, {acc_query, parent_alias} ->
-          expected_alias =
-            if parent_alias, do: String.to_atom("#{parent_alias}_#{assoc_name}"), else: assoc_name
+  def ensure_joins(query, chain) when is_list(chain) do
+    chain
+    |> Enum.reduce({query, nil}, fn
+      {assoc_name, related_schema, owner_key, related_key}, {acc_query, parent_alias} ->
+        expected_alias =
+          if parent_alias, do: String.to_atom("#{parent_alias}_#{assoc_name}"), else: assoc_name
 
-          already_joined? = Enum.any?(acc_query.joins, fn j -> j.as == expected_alias end)
+        if Enum.any?(acc_query.joins, fn j -> j.as == expected_alias end) do
+          {acc_query, expected_alias}
+        else
+          new_query =
+            do_join(acc_query, assoc_name, related_schema, owner_key, related_key, parent_alias)
 
-          if already_joined? do
-            {acc_query, expected_alias}
-          else
-            new_query =
-              OuterfacesEctoApi.QueryEngine.QueryJoiner.do_join(
-                acc_query,
-                assoc_name,
-                related_schema,
-                owner_key,
-                related_key,
-                parent_alias
-              )
-
-            {new_query, expected_alias}
-          end
-      end)
-      |> elem(0)
-    end
+          {new_query, expected_alias}
+        end
+    end)
+    |> elem(0)
   end
 
-  @spec do_join(Ecto.Query.t(), atom(), module(), atom(), atom(), atom()) ::
-          Ecto.Query.t()
-  defmacro do_join(
-             query,
-             assoc_name,
-             related_schema,
-             owner_key,
-             related_key,
-             parent_alias \\ nil
-           ) do
-    quote bind_quoted: [
-            query: query,
-            assoc_name: assoc_name,
-            related_schema: related_schema,
-            owner_key: owner_key,
-            related_key: related_key,
-            parent_alias: parent_alias
-          ] do
-      new_alias =
-        if parent_alias do
-          String.to_atom("#{parent_alias}_#{assoc_name}")
-        else
-          assoc_name
-        end
-
+  @spec do_join(Ecto.Query.t(), atom(), module(), atom(), atom(), atom() | nil) :: Ecto.Query.t()
+  def do_join(query, assoc_name, related_schema, owner_key, related_key, parent_alias \\ nil) do
+    new_alias =
       if parent_alias do
-        from([{^parent_alias, parent}] in query,
-          left_join: assoc in ^related_schema,
-          as: ^new_alias,
-          on: field(parent, ^owner_key) == field(assoc, ^related_key)
-        )
+        String.to_atom("#{parent_alias}_#{assoc_name}")
       else
-        from(e0 in query,
-          left_join: assoc in ^related_schema,
-          as: ^new_alias,
-          on: field(e0, ^owner_key) == field(assoc, ^related_key)
-        )
+        assoc_name
       end
+
+    if parent_alias do
+      from([{^parent_alias, parent}] in query,
+        left_join: assoc in ^related_schema,
+        as: ^new_alias,
+        on: field(parent, ^owner_key) == field(assoc, ^related_key)
+      )
+    else
+      from(e0 in query,
+        left_join: assoc in ^related_schema,
+        as: ^new_alias,
+        on: field(e0, ^owner_key) == field(assoc, ^related_key)
+      )
     end
   end
 

@@ -6,14 +6,43 @@ defmodule OuterfacesEctoApi.MixProject do
   def project do
     [
       app: :outerfaces_ex_ecto_api,
-      version: "0.2.7",
+      version: "0.2.8",
       elixir: "~> 1.18",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       name: "Outerfaces Ecto API",
       description: "'Good Enough' Query Engine for Ecto",
       source_url: @github_url,
-      package: package()
+      package: package(),
+      docs: docs()
+    ]
+  end
+
+  defp docs do
+    [
+      main: "readme",
+      extras: [
+        "README.md",
+        "guides/dynamic_specs.md": [title: "Dynamic Query Specifications"]
+      ],
+      groups_for_extras: [
+        Guides: ~r/guides\/.*/
+      ],
+      groups_for_modules: [
+        "Query Engine": [
+          OuterfacesEctoApi.QueryEngine,
+          OuterfacesEctoApi.QueryEngine.QueryBuilder,
+          OuterfacesEctoApi.QueryEngine.QueryJoiner,
+          OuterfacesEctoApi.QueryEngine.QueryFilter,
+          OuterfacesEctoApi.QueryEngine.QuerySort,
+          OuterfacesEctoApi.QueryEngine.QueryPager,
+          OuterfacesEctoApi.QueryEngine.QueryExpressor
+        ],
+        Serialization: [
+          OuterfacesEctoApi.QueryEngine.QueryAssociator,
+          OuterfacesEctoApi.QueryEngine.QuerySerializer
+        ]
+      ]
     ]
   end
 

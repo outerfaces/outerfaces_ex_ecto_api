@@ -548,4 +548,106 @@ defmodule QueryEngineTest do
     assert built_query |> inspect() ==
              "{:ok, #Ecto.Query<from t0 in QueryEngineTest.TestSchemaOne, left_join: u1 in QueryEngineTest.User, as: :user, on: t0.user_id == u1.id, where: u1.name == ^\"Bob\">}"
   end
+
+  # Tests verifying that QueryEngine works with runtime values (not just compile-time literals).
+  # This is important because QueryJoiner functions were previously macros, and calling macros
+  # with runtime values could cause macro expansion timing issues.
+
+  test "builds query with filter specs constructed from runtime variables" do
+    # These are runtime values, not compile-time literals
+    filter_key = :user_name
+    binding_list = [:user]
+    field_name = :name
+    operator = :==
+
+    filter_specs = [
+      {filter_key,
+       {QueryFilter, :by_association_field, binding_list, field_name, operator, false, nil}}
+    ]
+
+    built_query =
+      QueryEngine.build(
+        TestSchemaOne,
+        filter_specs,
+        %{"filters" => %{"user_name" => "RuntimeValue"}},
+        _opts = []
+      )
+
+    assert built_query |> inspect() ==
+             "{:ok, #Ecto.Query<from t0 in QueryEngineTest.TestSchemaOne, left_join: u1 in QueryEngineTest.User, as: :user, on: t0.user_id == u1.id, where: u1.name == ^\"RuntimeValue\">}"
+  end
+
+  test "builds query with filter specs from a function that returns specs at runtime" do
+    # Simulating specs built from external data (e.g., from config or database)
+    build_filter_spec = fn assoc_name, field ->
+      {String.to_atom("#{assoc_name}_#{field}"),
+       {QueryFilter, :by_association_field, [assoc_name], field, :==, false, nil}}
+    end
+
+    filter_specs = [build_filter_spec.(:user, :name)]
+
+    built_query =
+      QueryEngine.build(
+        TestSchemaOne,
+        filter_specs,
+        %{"filters" => %{"user_name" => "DynamicSpec"}},
+        _opts = []
+      )
+
+    assert built_query |> inspect() ==
+             "{:ok, #Ecto.Query<from t0 in QueryEngineTest.TestSchemaOne, left_join: u1 in QueryEngineTest.User, as: :user, on: t0.user_id == u1.id, where: u1.name == ^\"DynamicSpec\">}"
+  end
+
+  test "builds query with sort specs constructed from runtime variables" do
+    # Runtime-constructed sort specs
+    assoc_path = [:user]
+    sort_field = :name
+    default_direction = :asc
+
+    sort_specs = [
+      {:user_name,
+       {QuerySort, :by_association_field, assoc_path, sort_field, default_direction, true}}
+    ]
+
+    built_query =
+      QueryEngine.build(
+        TestSchemaOne,
+        _filter_specs = [],
+        %{},
+        sort_specs: sort_specs
+      )
+
+    assert built_query |> inspect() ==
+             "{:ok, #Ecto.Query<from t0 in QueryEngineTest.TestSchemaOne, left_join: u1 in QueryEngineTest.User, as: :user, on: t0.user_id == u1.id, order_by: [asc: u1.name]>}"
+  end
+
+  test "builds query with multiple runtime-constructed filter specs in reduce" do
+    # This mimics how QueryBuilder processes multiple filter params
+    assoc_configs = [
+      {:user, :name, "Alice"},
+      {:backup_user, :id, 42}
+    ]
+
+    filter_specs =
+      Enum.map(assoc_configs, fn {assoc, field, _value} ->
+        {String.to_atom("#{assoc}_#{field}"),
+         {QueryFilter, :by_association_field, [assoc], field, :==, false, nil}}
+      end)
+
+    filter_params =
+      assoc_configs
+      |> Enum.map(fn {assoc, field, value} -> {"#{assoc}_#{field}", value} end)
+      |> Map.new()
+
+    built_query =
+      QueryEngine.build(
+        TestSchemaOne,
+        filter_specs,
+        %{"filters" => filter_params},
+        _opts = []
+      )
+
+    assert built_query |> inspect() ==
+             "{:ok, #Ecto.Query<from t0 in QueryEngineTest.TestSchemaOne, left_join: u1 in QueryEngineTest.User, as: :backup_user, on: t0.backup_user_id == u1.id, left_join: u2 in QueryEngineTest.User, as: :user, on: t0.user_id == u2.id, where: u1.id == ^42, where: u2.name == ^\"Alice\">}"
+  end
 end

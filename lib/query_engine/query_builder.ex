@@ -2,7 +2,6 @@ defmodule OuterfacesEctoApi.QueryEngine.QueryBuilder do
   @moduledoc """
   Provides dynamic filtering and query building for API endpoints.
   """
-  require OuterfacesEctoApi.QueryEngine.QueryJoiner
   alias OuterfacesEctoApi.QueryEngine.QueryJoiner
   import Ecto.Query
 
