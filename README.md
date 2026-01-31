@@ -373,19 +373,37 @@ end
 ```
 
 ### Conditional Operators
+
+The operator position accepts either a single operator (`:==`, `:!=`, `:>`, etc.) or a tuple of two operators `{:truthy_op, :falsy_op}`. When a tuple is provided, the filter picks which operator to use based on the filter value:
+
 ```elixir
-# Operator changes based on filter value
 {:is_active, {QueryFilter, :by_field, :archived_at, {:is_nil, :not_nil}, false, true}}
-# When is_active: true -> uses :is_nil
-# When is_active: false -> uses :not_nil
-# When not provided -> defaults to true, uses :is_nil
 ```
 
+- `is_active: true` → uses first operator (`:is_nil`) → `WHERE archived_at IS NULL`
+- `is_active: false` → uses second operator (`:not_nil`) → `WHERE archived_at IS NOT NULL`
+- Not provided → default value `true` applied → `WHERE archived_at IS NULL`
+
+This lets you expose semantic filters to API consumers (`is_active`) without leaking implementation details (`archived_at`). The classic use case is soft deletes, but it works with any operator pair—`{:==, :!=}`, `{:>=, :<}`, etc.
+
 ### Default Filters
+
+The last element of the filter tuple is the **default/fallback value**. When the filter key is missing from the request, this value gets injected automatically:
+
 ```elixir
-# Applied when filter not explicitly provided
 {:tenant_scoped, {QueryFilter, :by_field, :tenant_id, :==, false, current_tenant_id}}
 ```
+
+- `filters: {tenant_scoped: 5}` → `WHERE tenant_id = 5` (explicit value used)
+- `filters: {}` (key missing) → `WHERE tenant_id = <current_tenant_id>` (default applied)
+- `filters: {tenant_scoped: nil}` → filter skipped (explicit nil + `allow_nil=false`)
+
+The default can be:
+- A literal value: `true`, `123`, `"active"`
+- A runtime function call: `{MyModule, :get_current_tenant, []}` — called at query time
+- `nil` — no default, filter only applies when explicitly provided
+
+This is how you enforce tenant isolation, soft-delete defaults, or security constraints without requiring every API call to specify them.
 
 ### Deep Association Filtering
 ```elixir
